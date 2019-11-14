@@ -139,18 +139,20 @@ data = reader.GetOutput()
 points = getPoints(data)
 triangles = getTriangles(data)
 
-fileDirectory = "./triangleSearch"
-if not os.path.exists(fileDirectory):
-    os.makedirs(fileDirectory)
+
 
 group = []
 triangleGroup = []
-# group = groupFinder(493)
+group = groupFinder(493)
 # print(triangles)
 # print("group")
 # print(group)
-# print("triangleGroup")
-# print(triangleGroup)
-writeFileWithTriangles([0,1,2,3,4,5], "./triangleSearch/test0_5")
-# print(len(triangleGroup))
-# print(triangles[1016])
+print("triangleGroup")
+print(triangleGroup)
+print(len(triangleGroup))
+
+fileDirectory = "./triangleSearch"
+if not os.path.exists(fileDirectory):
+    os.makedirs(fileDirectory)
+for x in range(int(len(triangleGroup)/75)):
+    writeFileWithTriangles(triangleGroup[0 : 50 + 75*x], "./triangleSearch/spread_"+str(x)+".vtk")
