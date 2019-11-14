@@ -449,7 +449,7 @@ def writeOneFile(intersecting, fileName):
     fileOut.write("POLYGONS " + str(numCells) + " " + str(cellListSize)+ "\n")
     for trianglePair in intersecting:
         for triangle in trianglePair:
-            fileOut.write("3 " + " ".join(map(str,triangle))+"\n")
+            fileOut.write("3 " + " ".join(map(str,triangles[triangle]))+"\n")
 
 # list of intersecting triangles with an index 
 def writeMultipleFiles(triangle1, triangle2, fileName):
@@ -479,7 +479,7 @@ def writeMultipleFiles(triangle1, triangle2, fileName):
 
 # ************************ RUNNER STUFF ***********************
 reader = vtk.vtkPolyDataReader()
-reader.SetFileName('vessel_triangles.vtk')
+reader.SetFileName('precisionCutTri.vtk')
 reader.ReadAllScalarsOn()
 reader.ReadAllVectorsOn()
 reader.Update()
@@ -490,28 +490,29 @@ points = getPoints(data)
 
 triangles = getTriangles(data)
 
-#total triangles: 15576
-runLength = 15576
+#total triangles: 15576 (for vessel_triangles.vtk)
+#total for inout.vtk: 8947
+# precision: 1390
+runLength = 4420
 print("runlength: " + str(runLength))
 intersecting, trueCount = runner(runLength)
 
-
-fileDirectory = "./garbage"
+fileDirectory = "./precision"
 if not os.path.exists(fileDirectory):
     os.makedirs(fileDirectory)
 
-# counter = 1
-# for pair in intersecting:
+counter = 1
+for pair in intersecting:
     
-#     writeMultipleFiles(pair[0], pair[1], fileDirectory + "/int{:04}".format(counter) + ".vtk")
-#     counter += 1
+    writeMultipleFiles(pair[0], pair[1], fileDirectory + "/int{:04}".format(counter) + ".vtk")
+    counter += 1
 
 print ("trueCount",trueCount)
 
 
-# np.save("intersectingTriangles", intersecting)
+np.save("intersectingTriangles", intersecting)
 
-# writeOneFile(intersecting)
+writeOneFile(intersecting, "precisionIntersecting.vtk")
     
 
 
