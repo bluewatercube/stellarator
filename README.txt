@@ -47,10 +47,13 @@ This is a multistep process
    This is necessary because different size chains may need to be dealt with differently.
 3. Load in tri_groups if necesasry and run sortGroups(tri_groups)
    Sort groups into different sizes, .npy files will be saved into new directory fixtriNumpyArrays
-   error_groups - groups with 2 triangles; called error groups because this should be empty. However,
-   this may differ with your project
-   four_groups - groups with 4 triangles (special case)
-   multi_groups - groups with 3 or 5 or more triangles (everything else)
+   - error_groups - groups with 2 triangles; called error groups because this should very likely be empty.
+     However, this may differ with your project
+   - four_groups - groups with 4 triangles (special case)
+   - multi_groups - groups with 3 or 5 or more triangles (everything else)
+   - Theoretically there should ONLY be intersections in four_groups. If there are any in error_groups,
+     your triangles in your mesh likely aren't connected with each other. If there are any in multi_groups,
+     two entire sheets of triangles are likely overlapping.
 4. Solve four_groups
     4a) Load in four_groups if necessary and run
           getFourList(four_groups)
@@ -63,6 +66,7 @@ This is a multistep process
         Note: fixFourGroups only fixes quads; four groups that don't intersect like quads will be ignored
         and not added to list of new triangles
     4d) Run finalWriter() to create vtk with the new fixed four_groups
+
 
 
    

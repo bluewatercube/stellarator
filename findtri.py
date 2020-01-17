@@ -409,7 +409,7 @@ def getScaleFactor(length, fac):
 ***********************************************************************
 '''
 
-def getIntersectingTris(tris,runSize):
+def getIntersectingTris(triangles,runSize):
     """
     Runner function that gets list of intersecting triangles
     Parameters:
@@ -423,12 +423,16 @@ def getIntersectingTris(tris,runSize):
 
     intersectingWithFactor = []
     boxes = []  #array of triangle bounding boxes
+    for i in range(0, 100):
+        print(triangles[i])
     for y in range(runSize):
-        boxes.append(boundingBox(triangles[tris[y]]))
+        boxes.append(boundingBox(triangles[y]))
     for y in range(runSize):
+        if y % 100 == 0:
+            print str(y) + " / " + str(runSize)
         for z in range(y+1,runSize):
-            tri1 = triangles[tris[y]]
-            tri2 = triangles[tris[z]]
+            tri1 = triangles[y]
+            tri2 = triangles[z]
             if pointSameCheck(tri1, tri2) and \
             boundingBoxCheck(boxes[y], boxes[z]) and \
             pointNearCheck(tri1, tri2, 2) and \
@@ -438,10 +442,12 @@ def getIntersectingTris(tris,runSize):
 
                 if intersectlen > 0 and fac>0:
                     
-                    intersectingWithFactor.append( [(tris[y],tris[z]) , getScaleFactor(intersectlen, fac)] )
+                    intersectingWithFactor.append( [(tri1, tri2) , getScaleFactor(intersectlen, fac)] )
                     trueCount += 1
                 
-    print ("trueCount",trueCount)
+    print str(runSize) + " / " + str(runSize)
+    print "Finished detecting intersections."
+    #print ("trueCount",trueCount)
 
     #sort intersectingWithFactor by scale factor
     intersectingWithFactor = sorted(intersectingWithFactor, key=itemgetter(1), reverse = True)
@@ -478,6 +484,30 @@ def writeFileWithTwoTris(triangle1, triangle2, fileName):
     fileOut.write("3 0 1 2\n")
     fileOut.write("3 3 4 5\n")
 
+def writeFileWithTriangleTuples(intersecting, fileName):
+    """
+    same as writeFileWithTriangle but with the triangles being tuples instead of indices
+    """
+    fileOut = open(fileName, "w")
+    fileOut.write("# vtk DataFile Version 3.0\n")
+    fileOut.write("Intersecting Triangles\n")
+    fileOut.write("ASCII\n")
+    fileOut.write("DATASET POLYDATA\n")
+
+    numPoints = len(points)
+    numCells = 2*len(intersecting) #num triangles
+    cellListSize = numCells * 4
+
+    fileOut.write("POINTS " + str(numPoints) + " float\n")
+    #print points
+    for point in points:
+        fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
+
+    fileOut.write("POLYGONS " + str(numCells) + " " + str(cellListSize)+ "\n")
+    for trianglePair in intersecting:
+        for triangle in trianglePair:
+            fileOut.write("3 " + " ".join(map(str,triangle))+"\n")
+
 def writeFileWithTriangles(triangleList, fileName):
     """
     fileName should be in the form "file.vtk"
@@ -497,7 +527,6 @@ def writeFileWithTriangles(triangleList, fileName):
         for pt in triangles[triangle]:
             point = points[pt]
             fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
-
 
     fileOut.write("POLYGONS %d %d\n" % (len(triangleList), 4*len(triangleList)) )
     for x in range(len(triangleList)):
@@ -594,22 +623,25 @@ def init(filename):
     points = getPoints(data)
     triangles = getTriangles(data)
     
-    #save to numpy arrays for use in fixtri.py
-    np.save("points", points)
-    np.save("triangles", triangles)
+    # #save to numpy arrays for use in fixtri.py
+    # np.save("points", points)
+    # np.save("triangles", triangles)
     
-    runLength = len(triangles)
+    # runLength = len(triangles)
 
-    #trueCount is number of intersections
-    #intersecting is list of intersecting triangle pairs
-    intersecting, trueCount = getIntersectingTris(triangles, runLength)
+    # #trueCount is number of intersections
+    # #intersecting is list of intersecting triangle pairs
+    # print("runlength: " + str(runLength))
+    # intersecting, trueCount = getIntersectingTris(triangles, runLength)
 
-    print("Number of intersections: %s" ( str(trueCount) ))
+    # print("Number of intersections: " + (str(trueCount) ))
 
+    # # creates intersectingTriangles.npy; needed for fixtri.py
+    # np.save("intersectingTriangles", intersecting)
+    intersecting= np.load("intersectingTriangles.npy")
     # write file to intersecting.vtk
-    writeOneFile(intersecting, "intersecting.vtk")
-    # creates intersectingTriangles.npy; needed for fixtri.py
-    np.save("intersectingTriangles", intersecting)
+    writeFileWithTriangleTuples(intersecting, "intersecting.vtk")
+    
 
 
 ''' *********** GLOBAL VARIABLES *********** '''
