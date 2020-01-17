@@ -7,42 +7,60 @@ from operator import itemgetter
 import scipy
 from scipy.spatial import Delaunay
 
-""" *********************************************************************
+"""
+*********************************************************************
                             PARSE DATA FUNCTIONS
-    ********************************************************************* """
+*********************************************************************
+"""
 
-#parses file for points
-def getPoints(data):
-    arr = []
-    #print(data.GetNumberOfPoints())
-    for i in range(data.GetNumberOfPoints()):
-        tupledata = data.GetPoint(i)
-        arr.append(tupledata)
+#don't really need these anymore?
+# def getPoints(data):
+#     """
+#     Parses STL or VTK data for points
+#     Parameters:
+#     data: STL or VTK data from getOutput()
+#     Returns:
+#     ndarr: Points as a numpy array of tuples
+#     """
+#     arr = []
+#     #print(data.GetNumberOfPoints())
+#     for i in range(data.GetNumberOfPoints()):
+#         tupledata = data.GetPoint(i)
+#         arr.append(tupledata)
 
-    np_arr = np.array(arr)
-    return np_arr
+#     np_arr = np.array(arr)
+#     return np_arr
 
-#parses file for triangles
-def getTriangles(data):
-    arr = []
+# def getTriangles(data):
+#     """
+#     Parses STL or VTK data for triangles
+#     Parameters:
+#     data: STL or VTK data from getOutput()
+#     Returns:
+#     list: Triangles as a list of point indeces
+#     """
+#     arr = []
     
-    cellArray = data.GetPolys() #this is vtkCellArray
-    cellArray.InitTraversal()
-    idList = vtk.vtkIdList()
+#     cellArray = data.GetPolys() #this is vtkCellArray
+#     cellArray.InitTraversal()
+#     idList = vtk.vtkIdList()
 
-    for i in range(0,cellArray.GetNumberOfCells()):
-        cellArray.GetNextCell(idList)
-        if idList.GetNumberOfIds()==3:
-            point1 = idList.GetId(0)
-            point2 = idList.GetId(1)
-            point3 = idList.GetId(2)
-            arr.append((int(point1), int(point2), int(point3)))
+#     for i in range(0,cellArray.GetNumberOfCells()):
+#         cellArray.GetNextCell(idList)
+#         if idList.GetNumberOfIds()==3:
+#             point1 = idList.GetId(0)
+#             point2 = idList.GetId(1)
+#             point3 = idList.GetId(2)
+#             arr.append((int(point1), int(point2), int(point3)))
     
-    return arr
+#     return arr
 
-# returns a list of groups of triangles that are intersecting together
-# format: [(group), (group), (group)]
 def getTriangleGroups(data, intersecting):
+    """
+    Returns a list of groups of triangles that are intersecting together
+    Format: [(group), (group), (group)] ex: [(1, 4, 5), (2, 3), (6, 7, 8, 9)]
+    Each group is a tuple of indeces
+    """
     triangles = list(data[:])
     groups = []
     visited = []
@@ -73,7 +91,6 @@ def getTriangleGroups(data, intersecting):
     
     return groups
     
-
 def dfs(visited,triangles,node,search):
     if node not in visited:
         visited.append(node)
@@ -88,13 +105,24 @@ def getTriList(triangles):
         triabc.add(pair[1])
     
     np.save("triint", list(triabc))
+    
+def getFourList(triangles):
+    triabc = set()
+    for pair in triangles:
+        triabc.add(pair[0])
+        triabc.add(pair[1])
+        triabc.add(pair[2])
+        triabc.add(pair[3])
+    
+    np.save("4list", list(triabc))
 
 """ *********************************************************************
                             SEARCHING FUNCTIONS
     ********************************************************************* """
-#returns two lists as a tuple: (line over triangles, node over triangles)
+
 def identifyIntersectType(triarr):
     """
+    Returns two lists as a tuple: (line over triangles, node over triangles)
     it's type "line over" if a triangle intersects with 2 triangles
     and an adjacent triangle intersects with the same 2 triangles
     """
@@ -109,8 +137,14 @@ def identifyIntersectType(triarr):
         tripair = TriPair(pair[0], pair[1], inter1, inter2)
         intersectionsList.append(tripair)
         
-#takes in groups from getTriangleGroups (list of lists)
-def vtk_tri_groups(tri_groups):   
+def vtk_tri_groups(tri_groups):  
+    """
+    Parameter: groups from getTriangleGroups (list of lists)
+    sorts into different types of triangle groups:
+        error groups (1 or 2 triangles)
+        quads (4 triangles)
+        multigroups (>4 triangles)
+    """ 
     fileDirectory = "./vtktrigroups"
     direrror = "./vtktrigroups/groupserror"
     dir4 = "./vtktrigroups/groups4"
@@ -135,8 +169,11 @@ def vtk_tri_groups(tri_groups):
             countmulti += 1
         writeGroupFile(group, filename)
                 
-#group is list of triangle indeces
 def writeGroupFile(group, filename):
+    """
+    Parameters: group is list of triangle indeces
+    writes the file for a single group of triangles
+    """
     fileOut = open(filename, "w+")
     fileOut.write("# vtk DataFile Version 3.0\n")
     group_string = ""
@@ -169,6 +206,14 @@ def writeGroupFile(group, filename):
         count += 3
 
 def findDoubles(group):
+    """
+    returns a list of triangle intersecting pairs
+    """
+    global triangles
+    # print("points")
+    # for tri in group:
+    #     print(triangles[tri])
+        
     doubles = []
     for x in range(len(group)):
         for y in range(x+1, len(group)):
@@ -177,26 +222,30 @@ def findDoubles(group):
     return doubles
 
 def lineErrorSearch(group):
+    """
+    returns groups of quads 
+    """
     doubles = findDoubles(group)
+    # print("doubles")
+    # print(doubles)
     quads = []
-    counter = 0
     for x in range(len(doubles)):
         for y in range(x+1, len(doubles)):
             if doubles[x][0] != doubles[y][0] and \
                 doubles[x][1] != doubles[y][0] and \
                 doubles[x][0] != doubles[y][1] and \
-                doubles[x][1] != doubles[y][1] and \
-                [doubles[x][0], doubles[y][0]] in intersectinglist and \
-                [doubles[x][1], doubles[y][0]] in intersectinglist and \
-                [doubles[x][0], doubles[y][1]] in intersectinglist and \
-                [doubles[x][1], doubles[y][1]] in intersectinglist:
-                if counter < 100:
-                    counter+=1
+                doubles[x][1] != doubles[y][1]:
+                # [doubles[x][0], doubles[y][0]] in intersectinglist and \
+                # [doubles[x][1], doubles[y][0]] in intersectinglist and \
+                # [doubles[x][0], doubles[y][1]] in intersectinglist and \
+                # [doubles[x][1], doubles[y][1]] in intersectinglist:
                 quads.append([(doubles[x][0], doubles[x][1]), (doubles[y][0], doubles[y][1])])
     return quads
     
-#returns list of triangle tuples that given tri intersects with
 def getInter(tri, triarr):
+    """
+    returns list of triangle tuples that given tri intersects with
+    """
     interarr = []
     for pair in triarr:
         if tri == pair[0]:
@@ -207,6 +256,10 @@ def getInter(tri, triarr):
     return interarr
 
 def sortGroups(tri_groups):
+    """
+    saves different group types into np file
+    used mainly for identifying four triangle groups 
+    """
     error_groups = []
     four_groups = []
     multi_groups = []
@@ -229,16 +282,19 @@ def sortGroups(tri_groups):
 """ *********************************************************************
                             FIXING FUNCTIONS
     ********************************************************************* """
-def error_triangle_groups(tri_groups):
-    # trigroup2 = []
-    # for group in tri_groups:
-    #     if len(group)==2 or len(group)==1:
-    #         trigroup2.append(group)
-    # vtk_tri_groups(trigroup2)
-    pass
+#delete
+# def error_triangle_groups(tri_groups):
+#     # trigroup2 = []
+#     # for group in tri_groups:
+#     #     if len(group)==2 or len(group)==1:
+#     #         trigroup2.append(group)
+#     # vtk_tri_groups(trigroup2)
+#     pass
 
 def four_triangle_groups(four_groups):
-
+    """
+    print which four-groups are quads
+    """
     for group in four_groups:
         print(lineErrorSearch(group))
 
@@ -246,10 +302,13 @@ def multi_triangle_groups(multi_groups):
     for group in multi_groups:
         print(lineErrorSearch(group))
 
-#quad is list of 2 tuples
 def fixQuad(quad):
-    #ex: A[BC] and [BC]D become [AD]B and [AD]C
-    #determine which double is on inside surface --> indoub
+    """
+    Parameter: quad is list of 2 tuples
+    fixes quads by redrawing the triangles from the same set of 4 points
+    ex: A[BC] and [BC]D become [AD]B and [AD]C
+    determine which double is on inside surface --> indoub
+    """
     index_avg_1 = sum(quad[0])/2.0
     index_avg_2 = sum(quad[1])/2.0
 
@@ -272,25 +331,36 @@ def fixQuad(quad):
     
     return [tuple(new_tri1), tuple(new_tri2), triangles[outdoub[0]], triangles[outdoub[1]]]
 
-#returns new triangles
-def fixFourGroups():
+def fixFourGroups(four_groups):
+    """
+    Goes through all four groups and fixes them with fixQuad()
+    Returns all_new_tris: list of tuples of new triangle indeces
+    indeces refer to points array
+    [(p1, p2, p3),(p4, p5, p6), (p7, p8, p9)]
+    """
     #print four_groups
     all_new_tris = []
     quads = []
+
+    # get all quads from the four groups (because some fourgroups aren't quads)
     for group in four_groups:
         quad = lineErrorSearch(group)
         if quad != []:
             quads += quad
-    print(quads)
     
+    # iterate over quads, combine each list of fixed triangles
+    # with list of all fixed triangles
     for quad in quads:
         new_tris = fixQuad(quad)
         all_new_tris += new_tris
     
     return all_new_tris
 
-#new_triangles is a list of tuples of point indeces
 def createFixedVTK(new_triangles, filename):
+    """
+    Creates a VTK with new fixed triangles
+    new_triangles is a list of tuples of point indeces
+    """
     fileOut = open(filename, "w+")
     fileOut.write("# vtk DataFile Version 3.0\n")
     group_string = ""
@@ -319,91 +389,170 @@ def createFixedVTK(new_triangles, filename):
         fileOut.write("3 %s %s %s\n" % ( str(count), str(count+1), str(count+2) ))
         count += 3
 
-#return list of tri tuples but with inner intersecting tris cut out
-def makeSwissCheeseTriangles(out_tri_arr):
-    
-    in_inter_tris = []
-    points_dict = {}
+def writeFileWithTriangles(triangleList, fileName):
+    fileOut = open(fileName, "w+")
+    fileOut.write("# vtk DataFile Version 3.0\n")
+    fileOut.write("Intersecting Triangles\n")
+    fileOut.write("ASCII\n")
+    fileOut.write("DATASET POLYDATA\n")
+    fileOut.write("POINTS %d float\n" % (3*len(triangleList)))
 
-    #loop through intersectinglist, add tris to in_inter_tri that are NOT in out_tri_arr
-    for pair in intersectinglist:
-        for tri in pair:
-            if tri not in out_tri_arr:
-                in_inter_tris.append(tri)
-    
-    #first add to points dictionary
-    #then remove inner intersecting tris from triangles
-    for index in in_inter_tris:
-        tri = triangles[index] #tuple of pts
-        for pt_index in tri:
-            pt = points[pt_index]
-            if pt not in points_dict.keys():
-                points_dict[pt] = 1
-            else:
-                points_dict[pt] += 1
-        triangles.remove(index)
+    #pt is int representing index in points array
+    #point is a tuple with XYZ coord
+    for triangle in triangleList:
+        for pt in triangles[triangle]:
+            point = points[pt]
+            fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
 
-#return array of indeces of triangles [[[a,b,c],[a,b,c],[a,b,c]],[[d,e,f],[d,e,f],[d,e,f]]]
-def delaunaytri(points):
-    x = []
-    y = []
-    z = []
-    faces = []
-    for i in range(len(points)):
-        x.append(points[i][0])
-        y.append(points[i][1])
-        z.append(points[i][2])
-    tri = Delaunay(np.array([x,y]).T)
-    print 'polyhedron(faces = ['
-    for vert in tri.simplices:
-        print '[%d,%d,%d],' % (vert[0],vert[1],vert[2]),
-        smallarr = [vert[0],vert[1],vert[2]]
-        faces.append(smallarr)
-    print '], '
-        
-    # from scipy.spatial import ConvexHull
-    # hull = ConvexHull(points)
-    # indices = hull.simplices
-    # vertices = points[indices]
-    return faces
-testpoints = [(1,2,0),(3,4,0),(5,6,0),(8,2,0),(2,1,0)]
-delaunaytri(testpoints)
-testpoints2 = [[1,2,0],[3,4,1],[5,6,3],[8,2,-2],[2,1,-1],[2,4,6]]
-delaunaytri(testpoints2)
+
+    fileOut.write("POLYGONS %d %d\n" % (len(triangleList), 4*len(triangleList)) )
+    for x in range(len(triangleList)):
+        fileOut.write("3 %d %d %d\n" % (3*x, 3*x+1, 3*x+2))
+    fileOut.close()
+    
+
+def finalwriter(fileName):
+    global triangles
+    global new_tris
+    #edit triangles to remove those in four groups
+    #fourList is list of indexes
+    # for i in range(len(triangles)):
+    #     if i in fourList:
+    #         print(triangles[i])
+    #         del triangles[i]
+    
+    value_list = []
+
+    for index in fourList:
+        value_list.append(triangles[index])
+    for val in value_list:
+        triangles.remove(val)
+    
+    triangles += new_tris
+    print("length")
+    print(len(triangles))
+
+    createFixedVTK(triangles,fileName)
+    
 """ ************************ GET DATA *********************** """
-reader = vtk.vtkPolyDataReader()
-reader.SetFileName('inneroutertri.vtk')
-reader.ReadAllScalarsOn()
-reader.ReadAllVectorsOn()
-reader.Update()
 
-data = reader.GetOutput()
+# reader = vtk.vtkPolyDataReader()
+# reader.SetFileName('ves_lr1.vtk')
+# reader.ReadAllScalarsOn()
+# reader.ReadAllVectorsOn()
+# reader.Update()
 
-points = getPoints(data)
-triangles = getTriangles(data) #list of tuples of point indexes
+# data = reader.GetOutput()
+
+
+# points = getPoints(data)
+# triangles = getTriangles(data) #list of tuples of point indexes
+points = np.load("points.npy")
+triangles = np.load("triangles.npy")
+    print(len(triangles))
+
+    createFixedVTK(triangles,fileName)
+    
+""" ************************ GET DATA *********************** """
+
+# reader = vtk.vtkPolyDataReader()
+# reader.SetFileName('ves_lr1.vtk')
+# reader.ReadAllScalarsOn()
+# reader.ReadAllVectorsOn()
+# reader.Update()
+
+# data = reader.GetOutput()
+
+
+# points = getPoints(data)
+# triangles = getTriangles(data) #list of tuples of point indexes
+points = np.load("points.npy")
+triangles = np.load("triangles.npy")
+    print(len(triangles))
+
+    createFixedVTK(triangles,fileName)
+    
+""" ************************ GET DATA *********************** """
+
+# reader = vtk.vtkPolyDataReader()
+# reader.SetFileName('ves_lr1.vtk')
+# reader.ReadAllScalarsOn()
+# reader.ReadAllVectorsOn()
+# reader.Update()
+
+# data = reader.GetOutput()
+
+
+# points = getPoints(data)
+# triangles = getTriangles(data) #list of tuples of point indexes
+points = np.load("points.npy")
+triangles = np.load("triangles.npy")
+    print(len(triangles))
+
+    createFixedVTK(triangles,fileName)
+    
+""" ************************ GET DATA *********************** """
+
+# reader = vtk.vtkPolyDataReader()
+# reader.SetFileName('ves_lr1.vtk')
+# reader.ReadAllScalarsOn()
+# reader.ReadAllVectorsOn()
+# reader.Update()
+
+# data = reader.GetOutput()
+
+
+# points = getPoints(data)
+# triangles = getTriangles(data) #list of tuples of point indexes
+points = np.load("points.npy")
+triangles = np.load("triangles.npy")
+    print(len(triangles))
+
+    createFixedVTK(triangles,fileName)
+    
+""" ************************ GET DATA *********************** """
+
+# reader = vtk.vtkPolyDataReader()
+# reader.SetFileName('ves_lr1.vtk')
+# reader.ReadAllScalarsOn()
+# reader.ReadAllVectorsOn()
+# reader.Update()
+
+# data = reader.GetOutput()
+
+
+# points = getPoints(data)
+# triangles = getTriangles(data) #list of tuples of point indexes
+points = np.load("points.npy")
+triangles = np.load("triangles.npy")
 
 # get intersecting triangles
 intersecting = np.load("intersectingTriangles.npy")
 intersectinglist = intersecting.tolist() #list of 2-int lists of tri indexes
+# print(intersectinglist)
 triint = np.load("triint.npy")
+# writeFileWithTriangles(triint, "trinint.vtk")
+# print(intersecting)
 """ ************************ RUNNER ************************** """
-
-# getTriList(intersecting)
+# print(triint)
+# getTriList(intersectinglist)
 # print(identifyIntersectType(triangles[:runLength])[:5])
 print("\n\n\n********************************************")
 # tri_groups = getTriangleGroups(triint, intersecting)
 # np.save("triangle_groups", tri_groups)
 
 tri_groups = np.load("triangle_groups.npy")
-#vtk_tri_groups(tri_groups)
-# sortGroups(tri_groups)
-
+# print(tri_groups)
+# vtk_tri_groups(tri_groups)
+sortGroups(tri_groups)
 error_groups = np.load("./fixtriNumpyArrays/error_groups.npy")
 four_groups = np.load("./fixtriNumpyArrays/four_groups.npy")
+# print(four_groups)
 multi_groups = np.load("./fixtriNumpyArrays/multi_groups.npy")
-
-
-
+# getFourList(four_groups)
+fourList = np.load("4list.npy")
+# print(fourList)
+writeFileWithTriangles(fourList, "intersectingQuads.vtk")
 # print(np.array([8185, 52344]) in intersecting[:, len(intersecting)])
 
 
@@ -424,7 +573,21 @@ multi_groups = np.load("./fixtriNumpyArrays/multi_groups.npy")
 
 """ testing for fixing four groups """
 # new_tris = fixFourGroups()
+
+# new_tris = fixQuad([[406,407], [2539,2538]])
+# print(triangles[406])
+# print(triangles[407])
+# print(triangles[2539])
+# print(triangles[2538])
 # print(new_tris)
-# # new_tris = fixQuad([[406,407], [2539,2538]])
+# for group in four_groups:
+#     stringer=""
+#     for triangle in group:
+#         for point in triangles[triangle]:
+#             stringer += str(point) + " "
+#         stringer += ", "
+#     print(stringer)
+# print(fourList)
 # createFixedVTK(new_tris, "fixed.vtk")
 #print(intersectinglist[0:100])
+# finalwriter("final.vtk")

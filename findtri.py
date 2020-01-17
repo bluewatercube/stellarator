@@ -5,11 +5,20 @@ from vtk.util import numpy_support as VN
 import os
 from operator import itemgetter
 
+'''
+***********************************************************************
+                                FUNCTIONS
+***********************************************************************
+'''
 
-# ******************** FUNCTIONS *********************
-
-#parses file for points
 def getPoints(data):
+    """
+    Parses STL or VTK data for points
+    Parameters:
+    data: STL or VTK data from getOutput()
+    Returns:
+    ndarr: Points as a numpy array of tuples
+    """
     arr = []
     #print(data.GetNumberOfPoints())
     for i in range(data.GetNumberOfPoints()):
@@ -21,14 +30,17 @@ def getPoints(data):
     np_arr = np.array(arr)
     return np_arr
 
-#parses file for triangles
 def getTriangles(data):
+    """
+    Parses STL or VTK data for triangles
+    Parameters:
+    data: STL or VTK data from getOutput()
+    Returns:
+    list: Triangles as a list of point indeces
+    """
     arr = []
-    
     cellArray = data.GetPolys() #this is vtkCellArray
-
     cellArray.InitTraversal()
-
     idList = vtk.vtkIdList()
     
     #print(cellArray.GetNumberOfCells())
@@ -46,22 +58,23 @@ def getTriangles(data):
     
     return arr
 
-    #for i in range(0, numCells):
-    #    numIds = 3
-    #    print(tupledata.GetCell(cellLocation,numIds))
-    #    cellLocation += 1 + numIds
-    #tupledata.InitTraversal()
-
-# checks if triangles has the same point
-# return false if two triangles have 2 same points
 def pointSameCheck(triangle1, triangle2):
-    
+    """
+    Checks if two triangles share the same point
+    Returns false if two triangles have 2 same points
+    """
     if len(list(set(triangle1).intersection(set(triangle2)))) >= 1:
         return False
     return True
-    
-def pointNearCheck(triangle1, triangle2, rf):
 
+def pointNearCheck(triangle1, triangle2, rf):
+    """
+    Checks if points of 2 triangles are within 0.000001 of each other
+    Parameters:
+    triangle1: tuple of triangle 1's point indeces
+    triangle2: tuple of triangle 2's point indeces
+    rf: round factor
+    """
     #append 6 3-number tuples representing triangle points
     trianglepoints = []
     for ptIndex in triangle1:
@@ -85,10 +98,13 @@ def pointNearCheck(triangle1, triangle2, rf):
         return False
     return True
 
-# returns bounding box of triangle in [(x1, x2), (y1, y2), (z1, z2)]
-# triangle should be tuple of point values eg (1,3,4)
 def boundingBox (triangle):
-    
+    """
+    Returns bounding box of triangle in [(x1, x2), (y1, y2), (z1, z2)]
+    Triangle should be tuple of point values eg (1,3,4)
+    Parameters:
+    triangle: tuple of triangle's point indeces
+    """
     # triangle = np.array([0,2,3])
     # points = np.array([(1.1,2.3,3.2), (2.5,3.1,4.5), (5.6, 4.6, 5.8), (7.8,6.8,9.7)])
     box=[]
@@ -97,9 +113,11 @@ def boundingBox (triangle):
     box.append(getHighestandLowest(points[triangle[0]][2], points[triangle[1]][2], points[triangle[2]][2]))
     return box
 
-# boxes should be in format [(x1, x2), (y1, y2), (z1, z2)]
-# returns true or false
 def boundingBoxCheck(box1, box2):
+    """
+    Determines if two triangle's bounding boxes overlap
+    Boxes should be in format [(x1, x2), (y1, y2), (z1, z2)]
+    """
     if box1[0][0] > box2[0][1] or box1[0][1] < box2[0][0] or \
         box1[1][0] > box2[1][1] or box1[1][1] < box2[1][0] or \
         box1[2][0] > box2[2][1] or box1[2][1] < box2[2][0]:
@@ -108,10 +126,11 @@ def boundingBoxCheck(box1, box2):
     else:
         return True
 
-# planeFormula of form (a,b,c,d)
-# return type of discriminant
 def planeCheck(triangle1, triangle2):
-    
+    """
+    Returns True if 2 points are on one side of the plane and 1 is on the other side
+    Returns False if all 3 points are on one side of the plane or all three points are on the plane
+    """
     planeForm1 = findPlane(triangle1)
     planeForm2 = findPlane(triangle2)
     #check triangle1 against planeForm2
@@ -133,17 +152,17 @@ def planeCheck(triangle1, triangle2):
     if discriminant2 in [15, 0, -3]:
         return False
 
-    return True
-
+    return True    
     
-    # return 0 for false
-    # return 1 for 2 on one side one on other
-    # return 2 for 1 point on plane with two points on either side
-    
-    
-# will return true or false depending on whether the triangles intersect
-# triangle should be tuple of point indeces referring to points array eg (1,3,4)
 def triangleIntersect(triangle1, triangle2):
+    """
+    Applies triangle intersection check algorithm to determine if intersecting
+    Parameters:
+    triangle1: tuple of triangle 1's point indeces
+    triangle2: tuple of triangle 2's point indeces
+    Returns:
+    bool: if triangles intersect
+    """
 
     a1,b1,c1,d1 = findPlane(triangle1)
     a2,b2,c2,d2 = findPlane(triangle2)
@@ -195,9 +214,7 @@ def triangleIntersect(triangle1, triangle2):
         planeForm1 = findPlane(triangle1)
         planeForm2 = findPlane(triangle2)
         
-        
         totDis1,totDis2 = 0,0
-        
         
         #check triangle1 against planeForm2
         for point in triangle1:
@@ -228,12 +245,18 @@ def triangleIntersect(triangle1, triangle2):
     return ( pointComparer(intersectionPoints1, intersectionPoints2), fac )
     
 
-    
-# ************************ HELPER FUNCTIONS ***********************
+'''
+***********************************************************************
+                            HELPER FUNCTIONS
+***********************************************************************
+'''
 
-# points is of form [(0.0, 0.0, 1.0), (3, 0.0, 1.0), (4, 0.0, 1.0), (1.0, 0.0, 1.0)]
-#points1 and points2 are int points
 def pointComparer(points1, points2):
+    """
+    Based upon ordering of the points, returns whether the triangles intersect or not
+    points is of form [(0.0, 0.0, 1.0), (3, 0.0, 1.0), (4, 0.0, 1.0), (1.0, 0.0, 1.0)]
+    points1 and points2 are int points
+    """
     index = -1
     if points1[0][0] != points2[0][0] and \
         points1[1][0] != points2[0][0] and \
@@ -284,10 +307,9 @@ def pointComparer(points1, points2):
     if high2 > high1 and low2 > low1:
         return high1 - low2 
 
-
-# intersection function
 def isect_line_plane_v3(p0, p1, p_co, p_no, epsilon=1e-6):
     """ 
+    Helps determine if triangles intersect
     p0, p1: define the line
     p_co, p_no: define the plane:
         p_co is a point on the plane (plane coordinate).
@@ -314,44 +336,28 @@ def isect_line_plane_v3(p0, p1, p_co, p_no, epsilon=1e-6):
         # The segment is parallel to plane
         return (None, None)
 
-
 def add_v3v3(v0, v1):
-    return (
-        v0[0] + v1[0],
-        v0[1] + v1[1],
-        v0[2] + v1[2],
-        )
-
+    """ Performs vector addition """
+    return ( v0[0] + v1[0],v0[1] + v1[1], v0[2] + v1[2])
 
 def sub_v3v3(v0, v1):
-    return (
-        v0[0] - v1[0],
-        v0[1] - v1[1],
-        v0[2] - v1[2],
-        )
-
+    """ Performs vector subtraction """
+    return (v0[0] - v1[0],v0[1] - v1[1],v0[2] - v1[2])
 
 def dot_v3v3(v0, v1):
-    return (
-        (v0[0] * v1[0]) +
-        (v0[1] * v1[1]) +
-        (v0[2] * v1[2])
-        )
-
+    """ Calculates dot product of vectors """
+    return ( (v0[0] * v1[0]) + (v0[1] * v1[1]) + (v0[2] * v1[2]) )
 
 def len_squared_v3(v0):
+    """ Returns magnitude of vector """
     return dot_v3v3(v0, v0)
 
-
 def mul_v3_fl(v0, f):
-    return (
-        v0[0] * f,
-        v0[1] * f,
-        v0[2] * f,
-        )
+    """ Performs scalar multiplication """
+    return ( v0[0] * f, v0[1] * f, v0[2] * f )
 
 def getHighestandLowest(x, y, z):
-    # helper function for boundingBox
+    """ Helper function for boundingBox """
     highest = x
     lowest = x
     if x < y:
@@ -367,8 +373,8 @@ def getHighestandLowest(x, y, z):
 
     return (lowest, highest)
 
-#returns tuple corresponding to coeff of plane formula
 def findPlane(triangle):
+    """ Returns tuple corresponding to normal vector of plane """
     point1 = points[triangle[0]]
     point2 = points[triangle[1]]
     point3 = points[triangle[2]]
@@ -376,13 +382,14 @@ def findPlane(triangle):
     v2 = np.subtract(point2,point1)
     cp = np.cross(v1, v2)
     a, b, c = cp
-    # d = -1*(np.dot(cp, point3))
     d = -1*(a*point1[0] + b*point1[1] + c*point1[2])
     return (a,b,c,d)
 
-# tells which side of the plane point is on
-# 1 for >, 0 for =, -1 for <
 def pointPlane(planeFormula, point):
+    """
+    Tells which side of the plane the point is on
+    1 for >, 0 for =, -1 for <
+    """
     discriminant = planeFormula[0]*point[0] + planeFormula[1]*point[1] + planeFormula[2]*point[2] + planeFormula[3]
     if round(discriminant, 6) == 0:
         return 0
@@ -391,31 +398,47 @@ def pointPlane(planeFormula, point):
     else:
         return 5
 
-#returns the length and fac multiplied by weighted factors summed
 def getScaleFactor(length, fac):
+    """ Returns the length and fac multiplied by weighted factors summed """
     return 1.0 * length / 2.75 / 2.843 + 0.5 - fac
     
-#returns intersectingTriangles (list of tuples of triangle pairs)
-def runner(runSize):
+
+'''
+***********************************************************************
+                                RUNTIME
+***********************************************************************
+'''
+
+def getIntersectingTris(tris,runSize):
+    """
+    Runner function that gets list of intersecting triangles
+    Parameters:
+    tris: list of triangles
+    runSize: number of triangles to check against each other
+    Returns:
+    list of tuples of triangle pairs
+    """
     trueCount = 0
     intersectingTriangles = []
 
     intersectingWithFactor = []
-    boxes = []
+    boxes = []  #array of triangle bounding boxes
     for y in range(runSize):
-        boxes.append(boundingBox(triangles[y]))
+        boxes.append(boundingBox(triangles[tris[y]]))
     for y in range(runSize):
         for z in range(y+1,runSize):
-            if pointSameCheck(triangles[y], triangles[z]) and \
+            tri1 = triangles[tris[y]]
+            tri2 = triangles[tris[z]]
+            if pointSameCheck(tri1, tri2) and \
             boundingBoxCheck(boxes[y], boxes[z]) and \
-            pointNearCheck(triangles[y], triangles[z], 2) and \
-            planeCheck(triangles[y], triangles[z]):
+            pointNearCheck(tri1, tri2, 2) and \
+            planeCheck(tri1, tri2):
 
-                intersectlen, fac = triangleIntersect(triangles[y], triangles[z])
+                intersectlen, fac = triangleIntersect(tri1, tri2)
 
                 if intersectlen > 0 and fac>0:
                     
-                    intersectingWithFactor.append( [(y,z) , getScaleFactor(intersectlen, fac)] )
+                    intersectingWithFactor.append( [(tris[y],tris[z]) , getScaleFactor(intersectlen, fac)] )
                     trueCount += 1
                 
     print ("trueCount",trueCount)
@@ -429,30 +452,11 @@ def runner(runSize):
 
     return (intersectingTriangles, trueCount)
 
-# writes out to intersect.vtk - puts all pairs in a single file
-def writeOneFile(intersecting, fileName):
-    fileOut = open(fileName, "w")
-    fileOut.write("# vtk DataFile Version 3.0\n")
-    fileOut.write("Intersecting Triangles\n")
-    fileOut.write("ASCII\n")
-    fileOut.write("DATASET POLYDATA\n")
-
-    numPoints = len(points)
-    numCells = 2*len(intersecting) #num triangles
-    cellListSize = numCells * 4
-
-    fileOut.write("POINTS " + str(numPoints) + " float\n")
-    #print points
-    for point in points:
-        fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
-
-    fileOut.write("POLYGONS " + str(numCells) + " " + str(cellListSize)+ "\n")
-    for trianglePair in intersecting:
-        for triangle in trianglePair:
-            fileOut.write("3 " + " ".join(map(str,triangles[triangle]))+"\n")
-
-# list of intersecting triangles with an index 
-def writeMultipleFiles(triangle1, triangle2, fileName):
+def writeFileWithTwoTris(triangle1, triangle2, fileName):
+    """
+    Writes file containing two traingles
+    filename of the form "file.vtk"
+    """
     fileOut = open(fileName, "w+")
     fileOut.write("# vtk DataFile Version 3.0\n")
     fileOut.write("Intersecting Triangles\n")
@@ -474,45 +478,177 @@ def writeMultipleFiles(triangle1, triangle2, fileName):
     fileOut.write("3 0 1 2\n")
     fileOut.write("3 3 4 5\n")
 
+def writeFileWithTriangles(triangleList, fileName):
+    """
+    fileName should be in the form "file.vtk"
+    triangleList is the list of intersecting triangles
+    writes out to intersect.vtk - puts all pairs in a single file
+    """
+    fileOut = open(fileName, "w+")
+    fileOut.write("# vtk DataFile Version 3.0\n")
+    fileOut.write("Intersecting Triangles\n")
+    fileOut.write("ASCII\n")
+    fileOut.write("DATASET POLYDATA\n")
+    fileOut.write("POINTS %d float\n" % (3*len(triangleList)))
+
+    #pt is int representing index in points array
+    #point is a tuple with XYZ coord
+    for triangle in triangleList:
+        for pt in triangles[triangle]:
+            point = points[pt]
+            fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
 
 
+    fileOut.write("POLYGONS %d %d\n" % (len(triangleList), 4*len(triangleList)) )
+    for x in range(len(triangleList)):
+        fileOut.write("3 %d %d %d\n" % (3*x, 3*x+1, 3*x+2))
+    fileOut.close()
 
-# ************************ RUNNER STUFF ***********************
-reader = vtk.vtkPolyDataReader()
-reader.SetFileName('precisionCutTri.vtk')
-reader.ReadAllScalarsOn()
-reader.ReadAllVectorsOn()
-reader.Update()
+def findTrisInBox(x1,x2,y1,y2,z1,z2):
+    """ Returns indexes of triangles in bounding box """
+    tris_in_box = []
+    for i in range(len(triangles)):
+        tri = triangles[i]
+        in_box = True
+        for point in tri:
+            pt = points[point] #access tuple from points arr
+            x = pt[0]
+            y = pt[1]
+            z = pt[2]
+            if not( x > x1 and x < x2 and \
+                y > y1 and y < y2 and \
+                z > z1 and z < z2 ):
+                in_box = False
+                break
+        if in_box == True:
+            tris_in_box.append(i)
+    return tris_in_box
 
-data = reader.GetOutput()
+def createFixedVTK(new_triangles, filename):
+    """ new_triangles is a list of tuples of point indices """
+    fileOut = open(filename, "w+")
+    fileOut.write("# vtk DataFile Version 3.0\n")
+    group_string = ""
+    fileOut.write("Fixed Triangles\n")
+    fileOut.write("ASCII\n")
+    fileOut.write("DATASET POLYDATA\n")
+    
+    num_points = len(new_triangles) * 3
 
-points = getPoints(data)
+    fileOut.write("POINTS " + str(num_points) + " float\n")
+    
+    for tri in new_triangles:
+        #pt is index of pt tuple in larger points list
+        for pt in tri:
+            point = points[pt]
+            fileOut.write(str(point[0])+" "+str(point[1])+" "+str(point[2])+"\n")
+    
+    #get num triangles
+    num_tri = len(new_triangles)
+    num_to_rep = num_tri * 4
 
-triangles = getTriangles(data)
+    fileOut.write("POLYGONS %s %s\n" % (str(num_tri), str(num_to_rep)))
+    
+    count = 0
+    for i in range(0,num_tri):
+        fileOut.write("3 %s %s %s\n" % ( str(count), str(count+1), str(count+2) ))
+        count += 3
+
+def getVtkData(filename):
+    """ Gets data from VTK """
+    reader = vtk.vtkPolyDataReader()
+    reader.SetFileName(filename)
+    reader.ReadAllScalarsOn()
+    reader.ReadAllVectorsOn()
+    reader.Update()
+    data = reader.GetOutput()
+    return data
+
+def getStlData(filename):
+    """ Gets data from STL """
+    reader = vtk.vtkSTLReader()
+    reader.SetFileName(filename)
+    reader.Update()
+    data = reader.GetOutput()
+    return data
+
+def init(filename):
+    """
+    Extracts points and triangles from file and assigns to global variables
+    filename example  = "file.stl"
+    file extensions supported: stl and vtk
+    """
+    global points
+    global triangles
+
+    #get file type
+    fileType = filename[-3:]
+    if fileType == "stl":
+        data = getStlData(filename)
+    elif fileType == "vtk":
+        data = getVtkData(filename)
+    else:
+        raise Exception('File type not supported')
+    
+    #parse data for points and triangles
+    points = getPoints(data)
+    triangles = getTriangles(data)
+    
+    #save to numpy arrays for use in fixtri.py
+    np.save("points", points)
+    np.save("triangles", triangles)
+    
+    runLength = len(triangles)
+
+    #trueCount is number of intersections
+    #intersecting is list of intersecting triangle pairs
+    intersecting, trueCount = getIntersectingTris(triangles, runLength)
+
+    print("Number of intersections: %s" ( str(trueCount) ))
+
+    # write file to intersecting.vtk
+    writeOneFile(intersecting, "intersecting.vtk")
+    # creates intersectingTriangles.npy; needed for fixtri.py
+    np.save("intersectingTriangles", intersecting)
+
+
+''' *********** GLOBAL VARIABLES *********** '''
+points = []
+triangles = []
+
+createFixedVTK(triangles, "fixedStellarator.vtk")
+
+# mins = [-25.9, -19.7, 19.8]
+# maxes = [24.2, 17.8, 56.5]
+# box_tris = findTrisInBox(mins[0],maxes[0],mins[1],maxes[1],mins[2],maxes[2])
+# print(box_tris)
+# print(len(box_tris))
+# print(len(triangles))
 
 #total triangles: 15576 (for vessel_triangles.vtk)
 #total for inout.vtk: 8947
 # precision: 1390
-runLength = 4420
-print("runlength: " + str(runLength))
-intersecting, trueCount = runner(runLength)
+#ves_lr1: 234160
+# cut down: 865
+# repaired = 1924
+# runLength = 865
+# print("runlength: " + str(runLength))
+# 
 
-fileDirectory = "./precision"
-if not os.path.exists(fileDirectory):
-    os.makedirs(fileDirectory)
+# fileDirectory = "./resolved"
+# if not os.path.exists(fileDirectory):
+#     os.makedirs(fileDirectory)
 
-counter = 1
-for pair in intersecting:
+# counter = 1
+# for pair in intersecting:
     
-    writeMultipleFiles(pair[0], pair[1], fileDirectory + "/int{:04}".format(counter) + ".vtk")
-    counter += 1
+#     writeMultipleFiles(pair[0], pair[1], fileDirectory + "/int{:04}".format(counter) + ".vtk")
+#     counter += 1
+# print(intersecting)
+# print ("trueCount",trueCount)
 
-print ("trueCount",trueCount)
 
 
-np.save("intersectingTriangles", intersecting)
-
-writeOneFile(intersecting, "precisionIntersecting.vtk")
     
 
 
